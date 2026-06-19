@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <title>Список дел</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      max-width: 550px;
+      margin: 40px auto;
+      padding: 0 16px;
+      background: #f5f5f5;
+    }
+
+    nav {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 24px;
+    }
+
+    nav a {
+      text-decoration: none;
+      padding: 6px 14px;
+      border-radius: 6px;
+      background: #ddd;
+      color: #333;
+    }
+
+    /* активная ссылка - router-link-active добавляется автоматически */
+    nav a.router-link-active {
+      background: #4a90e2;
+      color: white;
+    }
+
+    input {
+      padding: 8px;
+      font-size: 15px;
+      width: 70%;
+    }
+
+    button {
+      padding: 8px 12px;
+      cursor: pointer;
+      margin-left: 6px;
+    }
+
+    ul { padding: 0; margin-top: 16px; }
+
+    li {
+      list-style: none;
+      background: white;
+      padding: 10px 12px;
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      border-radius: 6px;
+    }
+
+    .done span { text-decoration: line-through; color: gray; }
+    span { flex: 1; }
+
+    .del {
+      border: none;
+      background: none;
+      color: red;
+      cursor: pointer;
+      font-size: 16px;
+    }
+
+    .empty { color: gray; margin-top: 16px; }
+  </style>
+</head>
+<body>
+
+<div id="app">
+  <h2>Список дел</h2>
+
+  <nav>
+    <router-link to="/">Все ({{ todos.length }})</router-link>
+    <router-link to="/active">Активные ({{ active }})</router-link>
+    <router-link to="/done">Выполненные ({{ done }})</router-link>
+  </nav>
+
+  <!-- страницы рендерятся здесь -->
+  <router-view :todos="filteredTodos" @toggle="toggle" @remove="remove"></router-view>
+
+  <!-- форма добавления всегда видна -->
+  <div style="margin-top: 20px;">
+    <input v-model="newTodo" @keyup.enter="add" placeholder="Новая задача..." />
+    <button @click="add">Добавить</button>
+  </div>
+</div>
+
+<script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+<script src="https://unpkg.com/vue-router@4/dist/vue-router.global.js"></script>
+<script>
+
+  const { createApp, ref, computed } = Vue
+  const { createRouter, createWebHashHistory } = VueRouter
+
+  // компонент списка - один на все три страницы, просто данные разные
+  const TodoList = {
+    props: ['todos'],
+    emits: ['toggle', 'remove'],
+    template: `
+      <ul v-if="todos.length">
+        <li v-for="todo in todos" :key="todo.id" :class="{ done: todo.done }">
+          <input type="checkbox" :checked="todo.done" @change="$emit('toggle', todo)" />
+          <span>{{ todo.text }}</span>
+          <button class="del" @click="$emit('remove', todo.id)">✕</button>
+        </li>
+      </ul>
+      <p class="empty" v-else>Здесь пусто</p>
+    `
+  }
+
+  const router = createRouter({
+    history: createWebHashHistory(),
+    routes: [
+      { path: '/',       component: TodoList }, // все задачи
+      { path: '/active', component: TodoList }, // только активные
+      { path: '/done',   component: TodoList }, // только выполненные
+    ]
+  })
+
+  createApp({
+    setup() {
+      const newTodo = ref('')
+
+      const todos = ref([
+        { id: 1, text: 'Купить продукты', done: false },
+        { id: 2, text: 'Позвонить маме', done: true  },
+        { id: 3, text: 'Сделать домашку', done: false },
+      ])
+
+      function add() {
+        if (!newTodo.value.trim()) return
+        todos.value.push({ id: Date.now(), text: newTodo.value, done: false })
+        newTodo.value = ''
+      }
+
+      function toggle(todo) {
+        todo.done = !todo.done
+      }
+
+      function remove(id) {
+        todos.value = todos.value.filter(t => t.id !== id)
+      }
+
+      // фильтрую в зависимости от текущего роута
+      const filteredTodos = computed(() => {
+        const path = router.currentRoute.value.path
+        if (path === '/active') return todos.value.filter(t => !t.done)
+        if (path === '/done')   return todos.value.filter(t =>  t.done)
+        return todos.value
+      })
+
+      const done   = computed(() => todos.value.filter(t =>  t.done).length)
+      const active = computed(() => todos.value.filter(t => !t.done).length)
+
+      return { newTodo, todos, filteredTodos, add, toggle, remove, done, active }
+    }
+  }).use(router).mount('#app')
+
+</script>
+
+</body>
+</html>
